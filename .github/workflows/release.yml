@@ -29,25 +29,33 @@ jobs:
           path: target/release/hyperzoom
 
   build-macos-intel:
-    name: macOS (Intel)
-    runs-on: macos-13
+    name: macOS (Intel via cross-compile)
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: brew install libvpx opus fdk-aac pkg-config
+      - name: Install x86_64 Homebrew and dependencies
+        run: |
+          # Install x86_64 Homebrew under Rosetta
+          arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          arch -x86_64 /usr/local/bin/brew install libvpx opus fdk-aac pkg-config
 
-      - name: Install Rust
+      - name: Install Rust with x86_64 target
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
 
-      - name: Build release
-        run: cargo build --release
+      - name: Build release for x86_64
+        env:
+          PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+          PKG_CONFIG_ALLOW_CROSS: 1
+        run: cargo build --release --target x86_64-apple-darwin
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: hyperzoom-macos-x86_64
-          path: target/release/hyperzoom
+          path: target/x86_64-apple-darwin/release/hyperzoom
 
   build-windows:
     name: Windows (x86_64)
@@ -60,22 +68,24 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup vcpkg and install dependencies
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: '962e5e39f8a25f42522f51fffc574e05a3efd26b'
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
+          echo "C:\vcpkg" >> $env:GITHUB_PATH
 
       - name: Install C libraries via vcpkg
         run: |
-          vcpkg install libvpx:x64-windows-static opus:x64-windows-static fdk-aac:x64-windows-static
+          C:\vcpkg\vcpkg install libvpx:x64-windows-static opus:x64-windows-static fdk-aac:x64-windows-static
 
       - name: Set environment for static linking
         run: |
-          echo "VPX_LIB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
-          echo "VPX_INCLUDE_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\include" >> $env:GITHUB_ENV
+          echo "VPX_LIB_DIR=C:\vcpkg\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
+          echo "VPX_INCLUDE_DIR=C:\vcpkg\installed\x64-windows-static\include" >> $env:GITHUB_ENV
           echo "VPX_STATIC=1" >> $env:GITHUB_ENV
-          echo "OPUS_LIB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
-          echo "OPUS_INCLUDE_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\include" >> $env:GITHUB_ENV
+          echo "OPUS_LIB_DIR=C:\vcpkg\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
+          echo "OPUS_INCLUDE_DIR=C:\vcpkg\installed\x64-windows-static\include" >> $env:GITHUB_ENV
           echo "OPUS_STATIC=1" >> $env:GITHUB_ENV
 
       - name: Build release
