@@ -1,0 +1,116 @@
+name: Build Releases
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggered by version tags like v0.1.0
+  workflow_dispatch:  # Manual trigger from GitHub UI
+
+jobs:
+  build-macos-arm:
+    name: macOS (Apple Silicon)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: brew install libvpx opus fdk-aac pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperzoom-macos-arm64
+          path: target/release/hyperzoom
+
+  build-macos-intel:
+    name: macOS (Intel)
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: brew install libvpx opus fdk-aac pkg-config
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperzoom-macos-x86_64
+          path: target/release/hyperzoom
+
+  build-windows:
+    name: Windows (x86_64)
+    runs-on: windows-latest
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup vcpkg and install dependencies
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: '962e5e39f8a25f42522f51fffc574e05a3efd26b'
+
+      - name: Install C libraries via vcpkg
+        run: |
+          vcpkg install libvpx:x64-windows-static opus:x64-windows-static fdk-aac:x64-windows-static
+
+      - name: Set environment for static linking
+        run: |
+          echo "VPX_LIB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
+          echo "VPX_INCLUDE_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\include" >> $env:GITHUB_ENV
+          echo "VPX_STATIC=1" >> $env:GITHUB_ENV
+          echo "OPUS_LIB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
+          echo "OPUS_INCLUDE_DIR=$env:VCPKG_ROOT\installed\x64-windows-static\include" >> $env:GITHUB_ENV
+          echo "OPUS_STATIC=1" >> $env:GITHUB_ENV
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperzoom-windows-x86_64
+          path: target/release/hyperzoom.exe
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-macos-arm, build-macos-intel, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Rename binaries
+        run: |
+          mv artifacts/hyperzoom-macos-arm64/hyperzoom artifacts/hyperzoom-macos-arm64.bin
+          mv artifacts/hyperzoom-macos-x86_64/hyperzoom artifacts/hyperzoom-macos-x86_64.bin
+          mv artifacts/hyperzoom-windows-x86_64/hyperzoom.exe artifacts/hyperzoom-windows-x86_64.exe
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/hyperzoom-macos-arm64.bin
+            artifacts/hyperzoom-macos-x86_64.bin
+            artifacts/hyperzoom-windows-x86_64.exe
+          generate_release_notes: true
