@@ -84,6 +84,7 @@ jobs:
           echo "VPX_LIB_DIR=C:\vcpkg\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
           echo "VPX_INCLUDE_DIR=C:\vcpkg\installed\x64-windows-static\include" >> $env:GITHUB_ENV
           echo "VPX_STATIC=1" >> $env:GITHUB_ENV
+          echo "VPX_VERSION=1.16.0" >> $env:GITHUB_ENV
           echo "OPUS_LIB_DIR=C:\vcpkg\installed\x64-windows-static\lib" >> $env:GITHUB_ENV
           echo "OPUS_INCLUDE_DIR=C:\vcpkg\installed\x64-windows-static\include" >> $env:GITHUB_ENV
           echo "OPUS_STATIC=1" >> $env:GITHUB_ENV
