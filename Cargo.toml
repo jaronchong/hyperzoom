@@ -26,5 +26,3 @@ mach2 = "0.6"
 libc = "0.2"
 nokhwa = { version = "0.10", features = ["input-avfoundation"] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Media"] }

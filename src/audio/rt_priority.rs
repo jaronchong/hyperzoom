@@ -56,7 +56,13 @@ pub fn promote_current_thread() -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn promote_current_thread() -> Result<(), String> {
-    use windows_sys::Win32::Media::AvSetMmThreadCharacteristicsW;
+    #[link(name = "avrt")]
+    extern "system" {
+        fn AvSetMmThreadCharacteristicsW(
+            task_name: *const u16,
+            task_index: *mut u32,
+        ) -> isize;
+    }
 
     let task_name: Vec<u16> = "Pro Audio\0".encode_utf16().collect();
     let mut task_index: u32 = 0;
