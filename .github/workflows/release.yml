@@ -19,6 +19,16 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-arm-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: macos-arm-cargo-
+
       - name: Build release
         run: cargo build --release
 
@@ -45,6 +55,16 @@ jobs:
         with:
           targets: x86_64-apple-darwin
 
+      - name: Cache Cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-intel-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: macos-intel-cargo-
+
       - name: Build release for x86_64
         env:
           PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
@@ -68,14 +88,24 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache vcpkg installed packages
+        id: vcpkg-cache
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: vcpkg-x64-windows-static-libvpx-opus-fdk-aac-v1
+
       - name: Install vcpkg
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          if (!(Test-Path "C:\vcpkg\vcpkg.exe")) {
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          }
           C:\vcpkg\bootstrap-vcpkg.bat
           echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
           echo "C:\vcpkg" >> $env:GITHUB_PATH
 
       - name: Install C libraries via vcpkg
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         run: |
           C:\vcpkg\vcpkg install libvpx:x64-windows-static opus:x64-windows-static fdk-aac:x64-windows-static
 
@@ -93,6 +123,16 @@ jobs:
           echo "OPUS_LIB_DIR=C:\vcpkg\installed\x64-windows-static" >> $env:GITHUB_ENV
           echo "OPUS_INCLUDE_DIR=C:\vcpkg\installed\x64-windows-static\include" >> $env:GITHUB_ENV
           echo "OPUS_STATIC=1" >> $env:GITHUB_ENV
+
+      - name: Cache Cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            target
+          key: windows-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: windows-cargo-
 
       - name: Build release
         run: cargo build --release
