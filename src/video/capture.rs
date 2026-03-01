@@ -16,7 +16,7 @@ pub struct CameraCapture {
 impl CameraCapture {
     /// Start capturing from the default camera.
     /// Pushes VideoFrames into the ring producer at ~30fps.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     pub fn start(mut producer: HeapProd<VideoFrame>) -> Result<Self, String> {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_flag = stop.clone();
@@ -34,33 +34,36 @@ impl CameraCapture {
         })
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     pub fn start(_producer: HeapProd<VideoFrame>) -> Result<Self, String> {
         log::warn!("Camera capture not supported on this platform");
         let stop = Arc::new(AtomicBool::new(false));
         Ok(Self { thread: None, stop })
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn capture_loop(stop: &AtomicBool, producer: &mut HeapProd<VideoFrame>) {
         use nokhwa::pixel_format::RgbFormat;
         use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
         use nokhwa::Camera;
 
-        // Request camera permission on macOS
-        let (perm_tx, perm_rx) = std::sync::mpsc::channel();
-        nokhwa::nokhwa_initialize(move |granted| {
-            let _ = perm_tx.send(granted);
-        });
-        match perm_rx.recv_timeout(std::time::Duration::from_secs(30)) {
-            Ok(true) => log::info!("Camera permission granted"),
-            Ok(false) => {
-                log::warn!("Camera permission denied");
-                return;
-            }
-            Err(_) => {
-                log::warn!("Camera permission timeout");
-                return;
+        // Request camera permission (required on macOS, no-op on Windows)
+        #[cfg(target_os = "macos")]
+        {
+            let (perm_tx, perm_rx) = std::sync::mpsc::channel();
+            nokhwa::nokhwa_initialize(move |granted| {
+                let _ = perm_tx.send(granted);
+            });
+            match perm_rx.recv_timeout(std::time::Duration::from_secs(30)) {
+                Ok(true) => log::info!("Camera permission granted"),
+                Ok(false) => {
+                    log::warn!("Camera permission denied");
+                    return;
+                }
+                Err(_) => {
+                    log::warn!("Camera permission timeout");
+                    return;
+                }
             }
         }
 
